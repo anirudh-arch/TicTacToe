@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic-Tac-Toe</title>
+    <style>
+        /* === CSS Styling === */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f9;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        #statusText {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        /* Container for board and line */
+        .board-container {
+            position: relative;
+        }
+
+        /* The Game Board Grid */
+        #board {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            grid-template-rows: repeat(3, 100px);
+            gap: 5px;
+            background-color: #333; 
+            padding: 5px;
+            border-radius: 8px;
+        }
+
+        .cell {
+            background-color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .cell:hover {
+            background-color: #e9e9e9;
+        }
+
+        /* === The Winning Line CSS === */
+        #win-line {
+            position: absolute;
+            background-color: #ff3366; /* Vibrant Red/Pink color */
+            border-radius: 5px;
+            display: none; /* Hidden by default */
+            z-index: 10;
+            pointer-events: none; /* Lets you click through it */
+            box-shadow: 0 0 10px rgba(255, 51, 102, 0.5);
+        }
+
+        /* Line positions based on the 8 ways to win */
+        .line-row-1 { top: 17%; left: 2%; width: 96%; height: 8px; display: block !important; }
+        .line-row-2 { top: 50%; left: 2%; width: 96%; height: 8px; display: block !important; transform: translateY(-50%); }
+        .line-row-3 { bottom: 17%; left: 2%; width: 96%; height: 8px; display: block !important; }
+        
+        .line-col-1 { left: 17%; top: 2%; height: 96%; width: 8px; display: block !important; }
+        .line-col-2 { left: 50%; top: 2%; height: 96%; width: 8px; display: block !important; transform: translateX(-50%); }
+        .line-col-3 { right: 17%; top: 2%; height: 96%; width: 8px; display: block !important; }
+        
+        .line-diag-1 { top: 50%; left: -10%; width: 120%; height: 8px; display: block !important; transform: translateY(-50%) rotate(45deg); }
+        .line-diag-2 { top: 50%; left: -10%; width: 120%; height: 8px; display: block !important; transform: translateY(-50%) rotate(-45deg); }
+
+        #restartBtn {
+            margin-top: 30px;
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        #restartBtn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- === HTML Structure === -->
+    <h1>Tic-Tac-Toe</h1>
+    <div id="statusText">X's turn</div>
+
+    <!-- Wrapped the board so the line can sit on top -->
+    <div class="board-container">
+        <div id="board">
+            <div cellIndex="0" class="cell"></div>
+            <div cellIndex="1" class="cell"></div>
+            <div cellIndex="2" class="cell"></div>
+            <div cellIndex="3" class="cell"></div>
+            <div cellIndex="4" class="cell"></div>
+            <div cellIndex="5" class="cell"></div>
+            <div cellIndex="6" class="cell"></div>
+            <div cellIndex="7" class="cell"></div>
+            <div cellIndex="8" class="cell"></div>
+        </div>
+        <!-- The invisible winning line -->
+        <div id="win-line"></div>
+    </div>
+
+    <button id="restartBtn">Restart Game</button>
+
+    <!-- === JavaScript Logic === -->
+    <script>
+        const cells = document.querySelectorAll('.cell');
+        const statusText = document.querySelector('#statusText');
+        const restartBtn = document.querySelector('#restartBtn');
+        const winLine = document.getElementById('win-line');
+
+        // Added CSS class references to the win conditions
+        const winConditions = [
+            { indexes: [0, 1, 2], lineClass: "line-row-1" },
+            { indexes: [3, 4, 5], lineClass: "line-row-2" },
+            { indexes: [6, 7, 8], lineClass: "line-row-3" },
+            { indexes: [0, 3, 6], lineClass: "line-col-1" },
+            { indexes: [1, 4, 7], lineClass: "line-col-2" },
+            { indexes: [2, 5, 8], lineClass: "line-col-3" },
+            { indexes: [0, 4, 8], lineClass: "line-diag-1" },
+            { indexes: [2, 4, 6], lineClass: "line-diag-2" }
+        ];
+
+        let options = ["", "", "", "", "", "", "", "", ""];
+        let currentPlayer = "X";
+        let running = false;
+
+        initializeGame();
+
+        function initializeGame() {
+            cells.forEach(cell => cell.addEventListener('click', cellClicked));
+            restartBtn.addEventListener('click', restartGame);
+            statusText.textContent = `${currentPlayer}'s turn`;
+            running = true;
+        }
+
+        function cellClicked() {
+            const cellIndex = this.getAttribute('cellIndex');
+
+            if (options[cellIndex] != "" || !running) {
+                return;
+            }
+
+            updateCell(this, cellIndex);
+            checkWinner();
+        }
+
+        function updateCell(cell, index) {
+            options[index] = currentPlayer;
+            cell.textContent = currentPlayer;
+            
+            // Adding colors to X and O makes it pop more
+            if (currentPlayer === "X") {
+                cell.style.color = "#007bff"; 
+            } else {
+                cell.style.color = "#28a745";
+            }
+        }
+
+        function changePlayer() {
+            currentPlayer = (currentPlayer == "X") ? "O" : "X";
+            statusText.textContent = `${currentPlayer}'s turn`;
+        }
+
+        function checkWinner() {
+            let roundWon = false;
+            let winningClass = "";
+
+            for (let i = 0; i < winConditions.length; i++) {
+                const condition = winConditions[i].indexes;
+                const cellA = options[condition[0]];
+                const cellB = options[condition[1]];
+                const cellC = options[condition[2]];
+
+                if (cellA == "" || cellB == "" || cellC == "") {
+                    continue;
+                }
+                if (cellA == cellB && cellB == cellC) {
+                    roundWon = true;
+                    winningClass = winConditions[i].lineClass; // Capture the correct line style
+                    break;
+                }
+            }
+
+            if (roundWon) {
+                statusText.textContent = `${currentPlayer} wins!`;
+                winLine.className = winningClass; // Activate the line
+                running = false;
+            } else if (!options.includes("")) {
+                statusText.textContent = `Draw!`;
+                running = false;
+            } else {
+                changePlayer();
+            }
+        }
+
+        function restartGame() {
+            currentPlayer = "X";
+            options = ["", "", "", "", "", "", "", "", ""];
+            statusText.textContent = `${currentPlayer}'s turn`;
+            cells.forEach(cell => {
+                cell.textContent = "";
+                cell.style.color = "#333"; // Reset text color
+            });
+            winLine.className = ""; // Hide the winning line again
+            running = true;
+        }
+    </script>
+</body>
+</html>
