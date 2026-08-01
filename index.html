@@ -63,15 +63,14 @@
         /* === The Winning Line CSS === */
         #win-line {
             position: absolute;
-            background-color: #ff3366; /* Vibrant Red/Pink color */
+            background-color: #ff3366; 
             border-radius: 5px;
-            display: none; /* Hidden by default */
+            display: none; 
             z-index: 10;
-            pointer-events: none; /* Lets you click through it */
+            pointer-events: none; 
             box-shadow: 0 0 10px rgba(255, 51, 102, 0.5);
         }
 
-        /* Line positions based on the 8 ways to win */
         .line-row-1 { top: 17%; left: 2%; width: 96%; height: 8px; display: block !important; }
         .line-row-2 { top: 50%; left: 2%; width: 96%; height: 8px; display: block !important; transform: translateY(-50%); }
         .line-row-3 { bottom: 17%; left: 2%; width: 96%; height: 8px; display: block !important; }
@@ -83,11 +82,11 @@
         .line-diag-1 { top: 50%; left: -10%; width: 120%; height: 8px; display: block !important; transform: translateY(-50%) rotate(45deg); }
         .line-diag-2 { top: 50%; left: -10%; width: 120%; height: 8px; display: block !important; transform: translateY(-50%) rotate(-45deg); }
 
-        #restartBtn {
+        #endGameBtn {
             margin-top: 30px;
             padding: 10px 20px;
             font-size: 1.2rem;
-            background-color: #007bff;
+            background-color: #dc3545; /* Red color for end game */
             color: white;
             border: none;
             border-radius: 5px;
@@ -95,19 +94,45 @@
             transition: background-color 0.2s;
         }
 
-        #restartBtn:hover {
-            background-color: #0056b3;
+        #endGameBtn:hover {
+            background-color: #c82333;
+        }
+
+        /* === Final Score Screen CSS === */
+        #finalScoreScreen {
+            display: none; /* Hidden until the game ends */
+            text-align: center;
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        #finalScoreScreen h2 {
+            margin-top: 0;
+            color: #333;
+            font-size: 2.5rem;
+        }
+
+        .score-tally {
+            font-size: 1.8rem;
+            margin: 15px 0;
+            color: #555;
+        }
+
+        #overallWinnerMessage {
+            margin-top: 30px;
+            font-size: 2rem;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
 
-    <!-- === HTML Structure === -->
     <h1>Tic-Tac-Toe</h1>
     <div id="statusText">X's turn</div>
 
-    <!-- Wrapped the board so the line can sit on top -->
-    <div class="board-container">
+    <div class="board-container" id="gameArea">
         <div id="board">
             <div cellIndex="0" class="cell"></div>
             <div cellIndex="1" class="cell"></div>
@@ -119,20 +144,27 @@
             <div cellIndex="7" class="cell"></div>
             <div cellIndex="8" class="cell"></div>
         </div>
-        <!-- The invisible winning line -->
         <div id="win-line"></div>
     </div>
 
-    <button id="restartBtn">Restart Game</button>
+    <button id="endGameBtn">End Game</button>
 
-    <!-- === JavaScript Logic === -->
+    <div id="finalScoreScreen">
+        <h2>Final Scores</h2>
+        <div class="score-tally">Player X: <span id="scoreXDisplay" style="color: #007bff; font-weight: bold;">0</span></div>
+        <div class="score-tally">Player O: <span id="scoreODisplay" style="color: #28a745; font-weight: bold;">0</span></div>
+        <div id="overallWinnerMessage"></div>
+    </div>
+
     <script>
         const cells = document.querySelectorAll('.cell');
         const statusText = document.querySelector('#statusText');
-        const restartBtn = document.querySelector('#restartBtn');
+        const endGameBtn = document.querySelector('#endGameBtn');
         const winLine = document.getElementById('win-line');
+        
+        const gameArea = document.getElementById('gameArea');
+        const finalScoreScreen = document.getElementById('finalScoreScreen');
 
-        // Added CSS class references to the win conditions
         const winConditions = [
             { indexes: [0, 1, 2], lineClass: "line-row-1" },
             { indexes: [3, 4, 5], lineClass: "line-row-2" },
@@ -147,12 +179,17 @@
         let options = ["", "", "", "", "", "", "", "", ""];
         let currentPlayer = "X";
         let running = false;
+        let gameHasEnded = false; 
+        let restartTimer;
+
+        let scoreX = 0;
+        let scoreO = 0;
 
         initializeGame();
 
         function initializeGame() {
             cells.forEach(cell => cell.addEventListener('click', cellClicked));
-            restartBtn.addEventListener('click', restartGame);
+            endGameBtn.addEventListener('click', finishGame);
             statusText.textContent = `${currentPlayer}'s turn`;
             running = true;
         }
@@ -160,7 +197,7 @@
         function cellClicked() {
             const cellIndex = this.getAttribute('cellIndex');
 
-            if (options[cellIndex] != "" || !running) {
+            if (options[cellIndex] != "" || !running || gameHasEnded) {
                 return;
             }
 
@@ -172,7 +209,6 @@
             options[index] = currentPlayer;
             cell.textContent = currentPlayer;
             
-            // Adding colors to X and O makes it pop more
             if (currentPlayer === "X") {
                 cell.style.color = "#007bff"; 
             } else {
@@ -200,33 +236,73 @@
                 }
                 if (cellA == cellB && cellB == cellC) {
                     roundWon = true;
-                    winningClass = winConditions[i].lineClass; // Capture the correct line style
+                    winningClass = winConditions[i].lineClass; 
                     break;
                 }
             }
 
             if (roundWon) {
-                statusText.textContent = `${currentPlayer} wins!`;
-                winLine.className = winningClass; // Activate the line
+                statusText.textContent = `${currentPlayer} wins this round!`;
+                winLine.className = winningClass; 
                 running = false;
+                
+                if (currentPlayer === "X") {
+                    scoreX++;
+                } else {
+                    scoreO++;
+                }
+
+                restartTimer = setTimeout(autoRestart, 1500);
+
             } else if (!options.includes("")) {
-                statusText.textContent = `Draw!`;
+                statusText.textContent = `It's a Draw!`;
                 running = false;
+                
+                restartTimer = setTimeout(autoRestart, 1500);
             } else {
                 changePlayer();
             }
         }
 
-        function restartGame() {
+        function autoRestart() {
+            if (gameHasEnded) return; 
+
             currentPlayer = "X";
             options = ["", "", "", "", "", "", "", "", ""];
             statusText.textContent = `${currentPlayer}'s turn`;
             cells.forEach(cell => {
                 cell.textContent = "";
-                cell.style.color = "#333"; // Reset text color
+                cell.style.color = "#333"; 
             });
-            winLine.className = ""; // Hide the winning line again
+            winLine.className = ""; 
             running = true;
+        }
+
+        function finishGame() {
+            gameHasEnded = true;
+            clearTimeout(restartTimer);
+
+            gameArea.style.display = "none";
+            statusText.style.display = "none";
+            endGameBtn.style.display = "none";
+            document.querySelector('h1').style.display = "none";
+
+            document.getElementById('scoreXDisplay').textContent = scoreX;
+            document.getElementById('scoreODisplay').textContent = scoreO;
+
+            const winnerMessage = document.getElementById('overallWinnerMessage');
+            if (scoreX > scoreO) {
+                winnerMessage.textContent = "🏆 Player X is the Overall Winner! 🏆";
+                winnerMessage.style.color = "#007bff";
+            } else if (scoreO > scoreX) {
+                winnerMessage.textContent = "🏆 Player O is the Overall Winner! 🏆";
+                winnerMessage.style.color = "#28a745";
+            } else {
+                winnerMessage.textContent = "🤝 It's a Tie! 🤝";
+                winnerMessage.style.color = "#333";
+            }
+
+            finalScoreScreen.style.display = "block";
         }
     </script>
 </body>
